@@ -5,7 +5,7 @@ export async function main(ns) {
   const url = "https://raw.githubusercontent.com/Confusified/bitburner-scripts/main/";
   const fileName = "printHelloWorld.js";
 
-  var randomFileName = "temp_" + generateRandomString() + ".js"
+  const randomFileName = "temp_" + Math.floor(Math.random() * Date.now()).toString(36) + ".js";
   var success = await ns.wget(url + fileName, randomFileName);
   if (success) ns.toast("Created new file.", 'success', 3000);
   else ns.toast("Failed to download file.", 'error', 3000);
@@ -14,7 +14,3 @@ export async function main(ns) {
   ns.ui.openTail(randomPID);
   ns.rm(randomFileName);
 }
-
-const generateRandomString = () => {
-  return Math.floor(Math.random() * Date.now()).toString(36);
-};
