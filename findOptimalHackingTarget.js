@@ -1,40 +1,22 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  /*
-  As a rule of thumb, your hacking target should be the Server
-  that has the highest ratio of MaxMoney / MinimumSecurityLevel 
-  and its RequiredHackingLevel is under half of your hacking level.
-  */
-  ns.ui.openTail();
-  ns.disableLog("ALL");
+  ns.disableLog('ALL');
+  ns.clearLog();
 
-  const hackingLevel = ns.getHackingLevel();
+  const allPrograms = ["BruteSSH.exe", "relaySMTP.exe", "SQLInject.exe", "HTTPWorm.exe", "FTPCrack.exe"];
+  const hackablePorts = getPrograms(ns, allPrograms);
 
-  var servers = getServers(ns);
-  var mostOptimalValue = 0;
-  var mostOptimalServer = null;
+  var foundServers = getServers(ns);
 
-  for (var i = 0; i < servers.length; i++) {
-    var moneySecurityRatio = (ns.getServerMaxMoney(servers[i]) / ns.getServerMinSecurityLevel(servers[i]))
-    var serverHackLvlReq = ns.getServerRequiredHackingLevel(servers[i]);
-    var hackingLevelRatio = ((hackingLevel / 2) / serverHackLvlReq)
-    var finalRatio = (moneySecurityRatio / hackingLevelRatio);
-    if (serverHackLvlReq > hackingLevel) {
-      ns.printf("Cannot hack '%s': Not high enough hacking level.", servers[i])
-      continue
+  for (var i = 0; i < foundServers.length; i++) {
+    if (canNuke(ns, foundServers[i], hackablePorts)) {
+      nukePorts(ns, foundServers[i], hackablePorts);
+      ns.nuke(foundServers[i]);
+      ns.printf("Succesfully gained ROOT access to '%s'.", foundServers[i]);
     }
-    else if (!ns.hasRootAccess(servers[i])) {
-      ns.printf("Cannot hack '%s': No root access.", servers[i])
-      continue
-    }
-
-    if (finalRatio > mostOptimalValue) {
-      mostOptimalValue = finalRatio;
-      mostOptimalServer = servers[i];
-    }
-    ns.printf("%s: %.2f (%.2f / %.2f)", servers[i], finalRatio, moneySecurityRatio, hackingLevelRatio);
   }
-  ns.printf("Most optimal: %s, %.2f ", mostOptimalServer, mostOptimalValue)
+
+  ns.toast("Finished nuking all eligible servers.", 'success', 2500);
 }
 
 /** @param {NS} ns */
@@ -57,4 +39,53 @@ function searchChildren(ns, hostname, collectedServers) {
     searchChildren(ns, children[i], collectedServers);
   }
   return collectedServers;
+}
+
+/** @param {NS} ns 
+ *  @param {string} hostname
+ *  @param {string[]} ownedPrograms */
+function canNuke(ns, hostname, ownedPrograms) {
+  var nukingPossible = true;
+  if (ns.hasRootAccess(hostname)) {
+    ns.printf("Already have ROOT access to '%s'.", hostname)
+    nukingPossible = false;
+  }
+
+  const portCountRequired = ns.getServerNumPortsRequired(hostname);
+  if (portCountRequired > ownedPrograms.length) {
+    ns.printf("Hostname '%s' requires more open ports. (%d/%d)", hostname, ownedPrograms.length, portCountRequired);
+    nukingPossible = false;
+  }
+  return nukingPossible;
+}
+
+/** @param {NS} ns 
+ *  @param {string} hostname 
+ *  @param {string[]} ownedPrograms */
+function nukePorts(ns, hostname, ownedPrograms) {
+  const scriptName = ns.getScriptName();
+  var scriptRam = ns.getScriptRam(scriptName);
+  for (var i = 0; i < ownedPrograms.length; i++) {
+    const program = ownedPrograms[i].toLowerCase().replace(".exe", "");
+
+    const programRamCost = ns.getFunctionRamCost(program);
+    scriptRam = ns.ramOverride(scriptRam + programRamCost);
+    ns[program](hostname);
+    // scriptRam = ns.ramOverride(scriptRam - programRamCost);
+    // currently produces RAM bug, hopefully a proper fix can be found in the future.
+
+  }
+  ns.ramOverride(scriptRam);
+}
+
+/** @param {NS} ns 
+ *  @param {string[]} allPrograms */
+function getPrograms(ns, allPrograms) {
+  var programsOwned = [];
+  for (var i = 0; i < allPrograms.length; i++) {
+    if (ns.fileExists(allPrograms[i], 'home')) {
+      programsOwned.push(allPrograms[i]);
+    }
+  }
+  return programsOwned;
 }
