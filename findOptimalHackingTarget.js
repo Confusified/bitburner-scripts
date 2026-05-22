@@ -1,22 +1,61 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  ns.disableLog('ALL');
-  ns.clearLog();
+  /*
+  As a rule of thumb, your hacking target should be the Server
+  that has the highest ratio of MaxMoney / MinimumSecurityLevel 
+  and its RequiredHackingLevel is under half of your hacking level.
+  
+  This rule of thumb does not account for 'traps' with terrible grow rates, such as 'foodnstuff'.
+  */
+  ns.ui.openTail();
+  ns.disableLog("ALL")
 
-  const allPrograms = ["BruteSSH.exe", "relaySMTP.exe", "SQLInject.exe", "HTTPWorm.exe", "FTPCrack.exe"];
-  const hackablePorts = getPrograms(ns, allPrograms);
+  const hackingLevel = ns.getHackingLevel();
+  const serverBlacklist = ["n00dles", "foodnstuff"];
 
-  var foundServers = getServers(ns);
+  var servers = getServers(ns);
+  var mostOptimalValue = 0;
+  var mostOptimalServer = null;
 
-  for (var i = 0; i < foundServers.length; i++) {
-    if (canNuke(ns, foundServers[i], hackablePorts)) {
-      nukePorts(ns, foundServers[i], hackablePorts);
-      ns.nuke(foundServers[i]);
-      ns.printf("Succesfully gained ROOT access to '%s'.", foundServers[i]);
+  for (var i = 0; i < servers.length; i++) {
+    var maxServerMoney = ns.getServerMaxMoney(servers[i]);
+    var moneySecurityRatio = (maxServerMoney / ns.getServerMinSecurityLevel(servers[i]))
+
+    var serverHackLvlReq = ns.getServerRequiredHackingLevel(servers[i]);
+    var hackingLevelRatio = (serverHackLvlReq / (hackingLevel / 2))
+    var growRatio = (ns.getServerGrowth(servers[i]) / 10);
+
+
+    var finalRatio = ((maxServerMoney / moneySecurityRatio) / hackingLevelRatio) * growRatio;
+
+    if (serverHackLvlReq > hackingLevel) {
+      // ns.printf("Cannot hack '%s': Not high enough hacking level for server.", servers[i]);
+      continue
     }
-  }
+    else if (!ns.hasRootAccess(servers[i])) {
+      // ns.printf("Cannot hack '%s': No root access to server.", servers[i]);
+      continue
+    }
+    else if (serverBlacklist.includes(servers[i])) {
+      // ns.printf("Cannot hack '%s': Server is blacklisted.", servers[i]);
+      continue
+    }
+    else if (ns.getServer(servers[i]).purchasedByPlayer) {
+      // ns.printf("Cannot hack '%s': Server owned by player.", servers[i]);
+      continue
+    }
+    else if (maxServerMoney == 0) {
+      // ns.printf("Cannot hack '%s': Server cannot have any money.", servers[i]);
+      continue
+    }
 
-  ns.toast("Finished nuking all eligible servers.", 'success', 2500);
+    if (finalRatio > mostOptimalValue) {
+      mostOptimalValue = finalRatio;
+      mostOptimalServer = servers[i];
+    }
+    ns.printf("%s: %d (((%d / %d) / %.3f) * %.2f)", servers[i], finalRatio, maxServerMoney, moneySecurityRatio, hackingLevelRatio, growRatio);
+  }
+  ns.printf("Most optimal: %s, %d", mostOptimalServer, mostOptimalValue)
 }
 
 /** @param {NS} ns */
@@ -39,53 +78,4 @@ function searchChildren(ns, hostname, collectedServers) {
     searchChildren(ns, children[i], collectedServers);
   }
   return collectedServers;
-}
-
-/** @param {NS} ns 
- *  @param {string} hostname
- *  @param {string[]} ownedPrograms */
-function canNuke(ns, hostname, ownedPrograms) {
-  var nukingPossible = true;
-  if (ns.hasRootAccess(hostname)) {
-    ns.printf("Already have ROOT access to '%s'.", hostname)
-    nukingPossible = false;
-  }
-
-  const portCountRequired = ns.getServerNumPortsRequired(hostname);
-  if (portCountRequired > ownedPrograms.length) {
-    ns.printf("Hostname '%s' requires more open ports. (%d/%d)", hostname, ownedPrograms.length, portCountRequired);
-    nukingPossible = false;
-  }
-  return nukingPossible;
-}
-
-/** @param {NS} ns 
- *  @param {string} hostname 
- *  @param {string[]} ownedPrograms */
-function nukePorts(ns, hostname, ownedPrograms) {
-  const scriptName = ns.getScriptName();
-  var scriptRam = ns.getScriptRam(scriptName);
-  for (var i = 0; i < ownedPrograms.length; i++) {
-    const program = ownedPrograms[i].toLowerCase().replace(".exe", "");
-
-    const programRamCost = ns.getFunctionRamCost(program);
-    scriptRam = ns.ramOverride(scriptRam + programRamCost);
-    ns[program](hostname);
-    // scriptRam = ns.ramOverride(scriptRam - programRamCost);
-    // currently produces RAM bug, hopefully a proper fix can be found in the future.
-
-  }
-  ns.ramOverride(scriptRam);
-}
-
-/** @param {NS} ns 
- *  @param {string[]} allPrograms */
-function getPrograms(ns, allPrograms) {
-  var programsOwned = [];
-  for (var i = 0; i < allPrograms.length; i++) {
-    if (ns.fileExists(allPrograms[i], 'home')) {
-      programsOwned.push(allPrograms[i]);
-    }
-  }
-  return programsOwned;
 }
