@@ -34,7 +34,7 @@ export async function main(ns) {
   if (keepFile == true) downloaded_fileName = fileName;
   else downloaded_fileName = "temp_" + Math.floor(Math.random() * Date.now()).toString(36) + ".js";
 
-  const success = await ns.wget(url + fileName, downloaded_fileName);
+  const success = await ns.wget(url.toString() + fileName.toString(), downloaded_fileName.toString());
   if (success) ns.toast("Created new file.", 'success', 3000);
   else ns.toast("Failed to download file.", 'error', 3000);
 

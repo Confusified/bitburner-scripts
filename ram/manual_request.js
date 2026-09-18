@@ -1,4 +1,4 @@
-import {callProxy, getServers} from "util/server_module.js";
+import {callProxy, getServers} from "util/server_module.ts";
 
 /** @param {NS} ns */
 export async function main(ns) {
