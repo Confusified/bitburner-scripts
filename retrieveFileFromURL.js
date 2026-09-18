@@ -45,7 +45,7 @@ export async function main(ns) {
   if (executeFile == true) {
     const randomPID = ns.run(downloaded_fileName);
     ns.ui.openTail(randomPID);
-    ns.printf("Spawned script '%s'", downloaded_fileName);
+    ns.printf("Running script '%s'", downloaded_fileName);
 
   }
 
